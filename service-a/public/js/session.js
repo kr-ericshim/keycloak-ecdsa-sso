@@ -141,6 +141,7 @@ export async function bootSession() {
     history.replaceState(null, "", url);
   }
   document.querySelectorAll("[data-gate]").forEach((n) => (n.hidden = true));
+  document.querySelectorAll("[data-host]").forEach((n) => (n.textContent = window.location.host));
   $("#app").hidden = false;
   return me;
 }

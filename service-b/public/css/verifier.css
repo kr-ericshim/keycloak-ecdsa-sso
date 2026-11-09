@@ -81,6 +81,7 @@
 }
 .verdict.is-valid { border-color: oklch(0.5 0.13 150 / 0.5); background: var(--success-bg); }
 .verdict.is-invalid { border-color: oklch(0.52 0.19 28 / 0.5); background: var(--danger-bg); }
+.verdict.is-unknown { border-color: oklch(0.7 0.12 75 / 0.6); background: oklch(0.97 0.035 85); }
 .verdict h2 { font-size: var(--text-xl); letter-spacing: -0.02em; }
 .verdict p { margin-top: var(--s-1); color: var(--fg-muted); }
 .verdict .verdict-meta { margin-top: var(--s-3); display: flex; gap: var(--s-2); flex-wrap: wrap; }
@@ -100,6 +101,7 @@
 }
 .is-valid .stamp { color: var(--ok-green); }
 .is-invalid .stamp { color: var(--seal-red); }
+.is-unknown .stamp { color: oklch(0.52 0.11 70); font-size: 18px; }
 .stamp small { display: block; font-family: var(--font-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.05em; }
 
 /* ---------- 단계 레일 ---------- */

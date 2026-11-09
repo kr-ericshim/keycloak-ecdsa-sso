@@ -107,14 +107,23 @@ function renderResult(r) {
 
   // 판정
   const verdict = $("#verdict");
-  verdict.className = `verdict ${r.valid ? "is-valid" : "is-invalid"}`;
   const failed = (r.steps || []).find((s) => s.ok === false);
+  // 발급자 키를 모르는 경우는 위조와 다르다: 내용은 그대로일 수 있지만 누가 서명했는지 확인할 수 없다
+  const unknownKey = !r.valid && failed?.key === "issuerKey";
+  const hashOk = (r.steps || []).find((s) => s.key === "hash")?.ok === true;
+  const v = r.valid
+    ? { cls: "is-valid", stamp: "眞本", en: "VERIFIED", title: "진본입니다", lead: r.summary }
+    : unknownKey
+      ? { cls: "is-unknown", stamp: "未確認", en: "UNKNOWN KEY", title: "이 검증소가 모르는 발급 키입니다",
+          lead: `이 증명서는 다른 서명 발급소(또는 예전 키)로 서명되었습니다.${hashOk ? " 내용이 바뀌지는 않았지만" : ""} 이 검증소가 신뢰하는 공개키가 아니라서 진위를 확인할 수 없습니다.` }
+      : { cls: "is-invalid", stamp: "僞造", en: "FORGED", title: "위조되었거나 손상된 증명서입니다", lead: r.summary };
+  verdict.className = `verdict ${v.cls}`;
   verdict.replaceChildren(
     el("div", { class: "stamp", "aria-hidden": "true" },
-      el("span", {}, r.valid ? "眞本" : "僞造", el("small", { text: r.valid ? "VERIFIED" : "FORGED" }))),
+      el("span", {}, v.stamp, el("small", { text: v.en }))),
     el("div", {},
-      el("h2", { text: r.valid ? "진본입니다" : "위조되었거나 손상된 증명서입니다" }),
-      el("p", { text: r.summary || (failed ? `${failed.label} 단계에서 실패했습니다.` : "") }),
+      el("h2", { text: v.title }),
+      el("p", { text: v.lead || (failed ? `${failed.label} 단계에서 실패했습니다.` : "") }),
       el("div", { class: "verdict-meta" },
         el("span", { class: "badge badge-accent", text: `ECDSA ${r.math?.curve?.name || "P-256"}` }),
         r.payload ? el("span", { class: "badge", text: `kid ${shortHex(r.payload?.issuer?.kid, 6, 4)}` }) : null,
@@ -289,7 +298,7 @@ async function loadHistory() {
     }
     list.replaceChildren(...items.slice(0, 8).map((h) =>
       el("li", {},
-        el("span", { class: `badge ${h.valid ? "badge-ok" : "badge-bad"}`, text: h.valid ? "진본" : "위조" }),
+        el("span", { class: `badge ${h.valid ? "badge-ok" : "badge-bad"}`, text: h.valid ? "진본" : "실패" }),
         el("span", { class: "h-title", text: `${h.title || "(제목 없음)"} · ${h.recipientName || "-"}` }),
         el("span", { class: "h-time", text: fmtTime(h.verifiedAt) }),
       )));
