@@ -133,4 +133,5 @@ npm test                          # 서명·검증·ECC 단위 테스트
 - 실제 도메인에서 로그인, 도메인 간 SSO, 증명서 검증, back-channel logout을 확인했다. 토큰 서명은 ES256.
 - 관리 콘솔과 master realm은 외부에서 404이고, SSH 터널로만 접근한다. 절차는 [docs/DEPLOY.md](docs/DEPLOY.md).
 - 시연 계정 비밀번호는 서버의 `deploy/production.env`에만 있다(저장소에 없음).
+- 회원가입: 로그인 화면의 "가입하기"에서 누구나 계정을 만들 수 있다(Google reCAPTCHA v2, 비밀번호 8자 이상, 로그인 5회 실패 시 점진적 잠금). 가입한 계정 하나로 발급소와 검증소를 모두 쓴다.
 
