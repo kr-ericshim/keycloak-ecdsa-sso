@@ -19,5 +19,10 @@ export function loadConfig(service, directory) {
     sessionSecret: process.env.SESSION_SECRET || `local-only-service-${service.toLowerCase()}-replace-this-session-secret`,
     cookieName: service === 'A' ? 'sid_a' : 'sid_b',
     issuerKeyUrl: process.env.ISSUER_KEY_URL || 'http://localhost:3001/api/issuer-key',
+    // 리버스 프록시(Caddy) 뒤에서 X-Forwarded-* 를 믿을 홉 수. 로컬 개발은 비워 둔다.
+    trustProxy: process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY : false,
+    // 프론트엔드의 "상대 서비스로 이동" 링크. /config.js 로 내려준다.
+    peerUrl: (process.env.PEER_URL || (service === 'A' ? 'http://localhost:3002' : 'http://localhost:3001')).replace(/\/$/, ''),
+    peerName: process.env.PEER_NAME || (service === 'A' ? '서명 검증소' : '서명 발급소'),
   };
 }

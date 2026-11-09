@@ -6,6 +6,11 @@ export function apiError(res, status, error, message) {
 }
 
 export function finishApp(app, config) {
+  // 배포 환경마다 다른 값은 정적 파일 대신 환경변수에서 만들어 내려준다.
+  app.get('/config.js', (req, res) => {
+    res.type('application/javascript').set('Cache-Control', 'no-cache')
+      .send(`window.APP_CONFIG = ${JSON.stringify({ peerUrl: config.peerUrl, peerName: config.peerName })};\n`);
+  });
   app.use(express.static(config.publicDir));
   app.get('/', (req, res, next) => res.sendFile(join(config.publicDir, 'index.html'), error => {
     if (error) next(error);

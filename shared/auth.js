@@ -53,6 +53,8 @@ export class IndexedMemoryStore extends session.MemoryStore {
 const sessionAction = (req, method) => promisify(req.session[method]).call(req.session);
 
 export function attachAuth(app, config, { store = new IndexedMemoryStore(), oidc = createOidc(config) } = {}) {
+  // 프록시가 TLS를 끝내므로 X-Forwarded-Proto 를 믿어야 Secure 쿠키를 발급할 수 있다.
+  if (config.trustProxy) app.set('trust proxy', config.trustProxy);
   const cookie = { httpOnly: true, sameSite: 'lax', secure: config.baseUrl.startsWith('https:'), path: '/' };
   app.use(session({
     name: config.cookieName, secret: config.sessionSecret, store,

@@ -68,7 +68,8 @@
         "backchannel.logout.revoke.offline.tokens": "false",
         "id.token.signed.response.alg": "ES256",
         "access.token.signed.response.alg": "ES256"
-      }
+      },
+      "fullScopeAllowed": false
     },
     {
       "clientId": "service-b",
@@ -102,7 +103,8 @@
         "backchannel.logout.revoke.offline.tokens": "false",
         "id.token.signed.response.alg": "ES256",
         "access.token.signed.response.alg": "ES256"
-      }
+      },
+      "fullScopeAllowed": false
     }
   ],
   "users": [
@@ -117,7 +119,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "alice-dev-password",
+          "value": "${DEMO_ALICE_PASSWORD:alice-dev-password}",
           "temporary": false
         }
       ],
@@ -134,7 +136,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "bob-dev-password",
+          "value": "${DEMO_BOB_PASSWORD:bob-dev-password}",
           "temporary": false
         }
       ],
