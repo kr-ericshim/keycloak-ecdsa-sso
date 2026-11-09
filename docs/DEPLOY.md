@@ -102,3 +102,30 @@ docker compose -f deploy/compose.prod.yml --env-file deploy/production.env up -d
 ```
 
 실제 배포 전에 `deploy/production.env`를 지우고 도메인으로 다시 만든다.
+
+## 8. 기존 Nginx Proxy Manager가 있는 서버 (현재 Vultr VPS)
+
+이 VPS는 80·443을 Nginx Proxy Manager(NPM)가 쓰고 있어서 Caddy 대신 NPM을 앞단으로 쓴다. 구성 파일은 `deploy/compose.npm.yml`이다.
+
+```bash
+deploy/gen-env.sh ericshim.me 내이메일@example.com
+docker compose -f deploy/compose.npm.yml --env-file deploy/production.env up -d --build --wait
+deploy/admin-console-setup.sh compose.npm.yml
+```
+
+- Keycloak 힙은 320MB로 고정했다(`KC_HEAP_OPTS_NPM`). 1코어·1GB 서버라 첫 기동에 몇 분 걸린다.
+- 관리 콘솔은 `ssh -L 18080:localhost:18080 vultr-sso` 후 http://localhost:18080/admin
+
+NPM 관리 화면(81번 포트, 외부 차단)은 `ssh -L 8181:localhost:81 vultr-sso` 후 http://localhost:8181 에서 연다. 프록시 호스트 3개를 만든다.
+
+| Domain | Forward Hostname / Port | 옵션 |
+|---|---|---|
+| idp.ericshim.me | `sso-keycloak` / `8080` | SSL: Let's Encrypt 새 인증서, Force SSL, HTTP/2 |
+| sign.ericshim.me | `sso-sign` / `3001` | 위와 같음 |
+| verify.ericshim.me | `sso-verify` / `3002` | 위와 같음 |
+
+idp 호스트의 Advanced 탭에는 관리 경로 차단을 넣는다.
+
+```nginx
+location ~ ^/(admin|realms/master)(/|$) { return 404; }
+```
