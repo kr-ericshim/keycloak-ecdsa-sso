@@ -161,6 +161,10 @@ export function attachAuth(app, config, { store = new IndexedMemoryStore(), oidc
       || typeof tamper.value !== 'string' || tamper.value.length < 1 || tamper.value.length > 200) {
       return apiError(res, 400, 'bad_request', '변경할 클레임과 1~200자의 문자열 값을 보내 주세요.');
     }
+    // 원래 값과 같으면 내용이 바뀌지 않으므로 위조 시연이 성립하지 않는다.
+    if (req.session.auth.claims[tamper.claim] === tamper.value) {
+      return apiError(res, 400, 'unchanged', '원래 값과 같습니다. 한 글자라도 다르게 입력하세요.');
+    }
     return sendTokenProof(req, res, tamper);
   });
 

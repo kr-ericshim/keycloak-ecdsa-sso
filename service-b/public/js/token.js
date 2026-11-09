@@ -9,7 +9,7 @@ const SERVICES = {
 const CLIENT_NAMES = { "service-a": "서명 발급소", "service-b": "서명 검증소" };
 const CLAIM_LABELS = { preferred_username: "아이디를", name: "이름을", email: "이메일을", sub: "사용자 ID를" };
 
-const state = { proof: null };
+const state = { proof: null, original: null }; // original: 위조하지 않은 토큰의 내용
 
 // ---------- 그리기 도우미 ----------
 
@@ -140,9 +140,8 @@ function render(p) {
 
 function suggestValue() {
   const claim = $("#t-claim").value;
-  const P = state.proof?.segments?.payload?.json || {};
-  const base = state.proof?.tampered ? null : P[claim];
-  if (typeof base !== "string" || !base) return;
+  const base = state.original?.[claim];
+  if (typeof base !== "string" || !base) { $("#t-value").value = ""; return; }
   const chars = [...base];
   chars[chars.length - 1] = String.fromCodePoint(chars[chars.length - 1].codePointAt(0) + 1);
   $("#t-value").value = chars.join("");
@@ -156,7 +155,7 @@ async function load(tamper) {
       ? await api("/api/token-proof", { method: "POST", body: JSON.stringify({ tamper }) })
       : await api("/api/token-proof");
     render(p);
-    if (!tamper) suggestValue();
+    if (!tamper) { state.original = p.segments?.payload?.json || {}; suggestValue(); }
   } catch (e) {
     if (e.message !== "unauthenticated") toast(e.message, { error: true });
   } finally {
@@ -170,12 +169,15 @@ function bindTamper() {
   $("#tamper-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const value = $("#t-value").value.trim();
-    if (!value) {
-      $("#e-value").textContent = "바꿀 값을 입력하세요.";
+    const claim = $("#t-claim").value;
+    const error = !value ? "바꿀 값을 입력하세요."
+      : value === state.original?.[claim] ? "원래 값과 같습니다. 한 글자라도 다르게 입력하세요." : "";
+    if (error) {
+      $("#e-value").textContent = error;
       $("#t-value").setAttribute("aria-invalid", "true");
       return;
     }
-    load({ claim: $("#t-claim").value, value });
+    load({ claim, value });
   });
   $("#reset-btn").addEventListener("click", () => load());
 }
