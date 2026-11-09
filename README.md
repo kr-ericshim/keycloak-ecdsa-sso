@@ -90,7 +90,7 @@ API 계약은 [docs/API.md](docs/API.md)에 정리했다.
 
 ### 아직 정하지 않은 것
 
-- 배포: VPS + `ericshim.me` 서브도메인(예: idp / sign / verify), Caddy로 HTTPS. VPS 준비 후 진행
+- (없음)
 
 제출 마감일과 가점 배점은 제공된 과제 안내에 명시되어 있지 않다.
 
@@ -120,3 +120,17 @@ npm test                          # 서명·검증·ECC 단위 테스트
 | 발급한 증명서 검증 | 6단계 통과, 직접 구현과 Node crypto 모두 통과 |
 | 받는 사람 한 글자 변경 후 검증 | 해시 재계산, ECDSA 검증 단계에서 실패 → 위조 판정 |
 | B에서 로그아웃 → A 접속 | back-channel logout으로 A 세션도 삭제, Keycloak 로그인 화면 표시 |
+
+## 9. 배포 (2026-11-09)
+
+| 구성 요소 | 주소 |
+|---|---|
+| 통합 인증 (Keycloak) | https://idp.ericshim.me |
+| 서명 발급소 (서비스 A) | https://sign.ericshim.me |
+| 서명 검증소 (서비스 B) | https://verify.ericshim.me |
+
+- Vultr VPS(Ubuntu 24.04, 1코어·1GB) 위의 기존 Nginx Proxy Manager 뒤에 `deploy/compose.npm.yml`로 올렸다. HTTPS는 Let's Encrypt.
+- 실제 도메인에서 로그인, 도메인 간 SSO, 증명서 검증, back-channel logout을 확인했다. 토큰 서명은 ES256.
+- 관리 콘솔과 master realm은 외부에서 404이고, SSH 터널로만 접근한다. 절차는 [docs/DEPLOY.md](docs/DEPLOY.md).
+- 시연 계정 비밀번호는 서버의 `deploy/production.env`에만 있다(저장소에 없음).
+
