@@ -129,3 +129,18 @@ idp 호스트의 Advanced 탭에는 관리 경로 차단을 넣는다.
 ```nginx
 location ~ ^/(admin|realms/master)(/|$) { return 404; }
 ```
+
+## 9. 회원가입과 reCAPTCHA
+
+realm 설정으로 회원가입이 열려 있다(비밀번호 8자 이상·아이디/이메일과 다르게, 로그인 5회 실패 시 점진적 잠금). 가입 단계의 reCAPTCHA는 키가 필요해서 import 뒤에 스크립트로 켠다.
+
+1. https://www.google.com/recaptcha/admin/create 에서 v2 "로봇이 아닙니다" 체크박스 키를 만든다. 도메인: `idp.ericshim.me`, `localhost`
+2. 서버의 `deploy/production.env`에 `RECAPTCHA_SITE_KEY`, `RECAPTCHA_SECRET`을 넣는다(비밀 키는 git 에 넣지 않는다)
+3. 실행
+
+```bash
+deploy/enable-recaptcha.sh deploy/compose.npm.yml deploy/production.env
+```
+
+realm 을 다시 import 하면(데이터 볼륨 삭제) 3번을 다시 실행한다. 로컬에서는 Google 공개 테스트 키로 확인할 수 있다(항상 통과, 화면에 테스트 경고 표시).
+

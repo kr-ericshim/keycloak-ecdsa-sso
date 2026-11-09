@@ -3,7 +3,7 @@
   "enabled": true,
   "displayName": "Crypto SSO 실습",
   "sslRequired": "none",
-  "registrationAllowed": false,
+  "registrationAllowed": true,
   "resetPasswordAllowed": false,
   "loginWithEmailAllowed": true,
   "defaultSignatureAlgorithm": "ES256",
@@ -148,5 +148,25 @@
   "supportedLocales": [
     "ko"
   ],
-  "defaultLocale": "ko"
+  "defaultLocale": "ko",
+  "registrationEmailAsUsername": false,
+  "verifyEmail": false,
+  "duplicateEmailsAllowed": false,
+  "passwordPolicy": "length(8) and notUsername and notEmail",
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "quickLoginCheckMilliSeconds": 1000,
+  "minimumQuickLoginWaitSeconds": 60,
+  "maxDeltaTimeSeconds": 43200,
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self' https://www.google.com https://recaptcha.google.com; frame-ancestors 'self'; object-src 'none';",
+    "xFrameOptions": "SAMEORIGIN",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains",
+    "referrerPolicy": "no-referrer"
+  }
 }
