@@ -1,7 +1,7 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { canonicalize } from '../../shared/canonical.js';
 import { validateFields } from '../../shared/certificate-fields.js';
-import { curveInfo, hex, pointHex, isOnCurve, manualVerify, n } from './ecc-p256.js';
+import { curveInfo, hex, pointHex, isOnCurve, manualVerify, n } from '../../shared/ecc-p256.js';
 
 const hex32 = /^[0-9a-f]{64}$/;
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);

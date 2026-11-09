@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { loadIssuer, issueCertificate } from '../../service-a/src/crypto.js';
 import { verifyCertificate } from '../src/verify.js';
 import { createIssuerKeySource } from '../src/issuer-key.js';
-import { G, p, n, add, multiply, isOnCurve, manualVerify } from '../src/ecc-p256.js';
+import { G, p, n, add, multiply, isOnCurve, manualVerify } from '../../shared/ecc-p256.js';
 
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'crypto-sso-b-'));

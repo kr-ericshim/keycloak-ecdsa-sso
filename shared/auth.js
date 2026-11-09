@@ -1,7 +1,8 @@
 import session from 'express-session';
 import { promisify } from 'node:util';
 import { createOidc } from './oidc.js';
-import { apiError } from './http.js';
+import { apiError, requireJson } from './http.js';
+import { tokenProof } from './token-proof.js';
 
 // 두 localhost 서비스는 포트가 달라도 쿠키를 공유하므로 cookieName을 다르게 쓴다.
 export class IndexedMemoryStore extends session.MemoryStore {
@@ -61,7 +62,7 @@ export function attachAuth(app, config, { store = new IndexedMemoryStore(), oidc
     resave: false, saveUninitialized: false, cookie: { ...cookie, maxAge: 10 * 60_000 },
   }));
 
-  // API 응답에는 토큰 원문 및 서명을 절대 싣지 않는다.
+  // 토큰 원문과 전체 base64url 조각은 API 응답에 싣지 않는다.
   app.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
   app.get('/login', async (req, res) => {
@@ -134,6 +135,33 @@ export function attachAuth(app, config, { store = new IndexedMemoryStore(), oidc
         expiresAt: new Date(claims.exp * 1000).toISOString() },
       token: { header, claims, signatureVerified: true },
     });
+  });
+
+  function requireIdToken(req, res, next) {
+    if (typeof req.session.auth.idToken !== 'string' || !req.session.auth.idToken) {
+      return res.status(401).json({ error: 'unauthenticated' });
+    }
+    next();
+  }
+
+  async function sendTokenProof(req, res, tamper = null) {
+    try {
+      const proof = await tokenProof(req.session.auth.idToken, oidc, tamper);
+      res.json({ service: config.service, ...proof });
+    } catch {
+      // 예외 메시지에도 토큰이 포함될 수 있으므로 응답하거나 기록하지 않는다.
+      apiError(res, 400, 'bad_request', 'ID 토큰의 형식을 확인하지 못했습니다. 다시 로그인해 주세요.');
+    }
+  }
+
+  app.get('/api/token-proof', requireAuth, requireIdToken, (req, res) => sendTokenProof(req, res));
+  app.post('/api/token-proof', requireAuth, requireIdToken, requireJson, (req, res) => {
+    const tamper = req.body?.tamper;
+    if (!tamper || !['preferred_username', 'name', 'email', 'sub'].includes(tamper.claim)
+      || typeof tamper.value !== 'string' || tamper.value.length < 1 || tamper.value.length > 200) {
+      return apiError(res, 400, 'bad_request', '변경할 클레임과 1~200자의 문자열 값을 보내 주세요.');
+    }
+    return sendTokenProof(req, res, tamper);
   });
 
   return { requireAuth, store };

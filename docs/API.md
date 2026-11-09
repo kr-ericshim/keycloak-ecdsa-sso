@@ -127,3 +127,45 @@
 ## 5. 오류 형식
 
 JSON API 오류는 `{ "error": "code", "message": "한국어 설명" }` 형식이다. 401은 `unauthenticated`, 400은 `bad_request`, 404는 `not_found`를 쓴다.
+
+## 6. ID 토큰 서명 직접 검증 (A, B 공통, 로그인 필요)
+
+Keycloak이 이 세션에 발급한 ID 토큰(ES256)을 서버가 BigInt P-256 코드와 Node `crypto`로 각각 검증해 과정을 돌려준다. **토큰 원문은 응답에 넣지 않는다.** base64url 조각은 앞 12자·뒤 8자만 내려준다.
+
+| 메서드·경로 | 요청 | 설명 |
+|---|---|---|
+| `GET /api/token-proof` | - | 세션의 실제 ID 토큰 검증 |
+| `POST /api/token-proof` | `{ "tamper": { "claim": "preferred_username", "value": "alicf" } }` | 서버가 토큰 사본의 클레임 하나를 바꾼 뒤(서명은 그대로) 검증. 바꿀 수 있는 클레임: `preferred_username`, `name`, `email`, `sub` (문자열, 200자 이하) |
+
+응답:
+
+```json
+{
+  "service": "A",
+  "valid": true,
+  "tampered": null,
+  "segments": {
+    "header":    { "head": "eyJhbGciOiJF", "tail": "In0", "length": 95,  "json": { "alg": "ES256", "typ": "JWT", "kid": "..." } },
+    "payload":   { "head": "eyJleHAiOjE3", "tail": "Q2xhaW0", "length": 840, "json": { "iss": "...", "aud": "service-a", "sub": "...", "exp": 0, "iat": 0, "auth_time": 0, "preferred_username": "alice", "name": "Alice Kim", "email": "..." } },
+    "signature": { "head": "q3Zb1x0aQ2kd", "tail": "Zx9AbQ", "length": 86 }
+  },
+  "key": { "kid": "...", "alg": "ES256", "crv": "P-256", "jwksUrl": "https://idp.ericshim.me/realms/crypto-sso/protocol/openid-connect/certs", "Q": { "x": "hex", "y": "hex" } },
+  "signature": { "r": "hex 64자", "s": "hex 64자" },
+  "hash": { "signedBytes": 936, "e": "hex 64자" },
+  "math": { "w": "hex", "u1": "hex", "u2": "hex", "R": { "x": "hex", "y": "hex" }, "RxModN": "hex 64자" },
+  "checks": [
+    { "key": "alg",     "label": "서명 방식이 ES256인가",          "ok": true,  "detail": "헤더 alg = ES256" },
+    { "key": "key",     "label": "Keycloak 공개키 찾기",            "ok": true,  "detail": "JWKS에서 kid 일치" },
+    { "key": "onCurve", "label": "공개키가 P-256 곡선 위의 점인가", "ok": true,  "detail": "" },
+    { "key": "ecdsa",   "label": "서명 대조 (R.x = r)",             "ok": true,  "detail": "직접 구현과 Node crypto 모두 일치" },
+    { "key": "claims",  "label": "발급자·대상 확인",                "ok": true,  "detail": "iss, aud 일치" }
+  ],
+  "manualValid": true,
+  "libraryValid": true,
+  "expiresInSeconds": 212
+}
+```
+
+- `valid`는 `alg`, `key`, `onCurve`, `ecdsa`, `claims`가 모두 참일 때만 참이다. 만료(`exp`)는 판정에 넣지 않고 `expiresInSeconds`(음수면 만료)로만 알려준다.
+- `tampered`는 위조 요청일 때 `{ "claim", "from", "to" }`. 이때 `hash.e`가 달라지고 `ecdsa`가 실패해야 한다.
+- JWKS는 서버가 내부 주소로 가져오고, `jwksUrl`은 브라우저 기준 공개 주소다.

@@ -52,12 +52,26 @@ export function createOidc(config, { fetcher = globalThis.fetch } = {}) {
           if (typeof metadata[name] !== 'string') throw new Error(`발견 문서에 ${name}가 없습니다.`);
         }
         jwks = createRemoteJWKSet(new URL(serverUrl(metadata.jwks_uri)), {
-          timeoutDuration: timeoutMs, [customFetch]: fetcher,
+          timeoutDuration: timeoutMs, cacheMaxAge: 60_000, [customFetch]: fetcher,
         });
         return metadata;
       })().catch(error => { discoveryPromise = undefined; throw error; });
     }
     return discoveryPromise;
+  }
+
+  // 로그인 검증과 같은 JWKS 캐시를 쓴다. 키 교체 시 모르는 kid는 한 번만 재조회한다.
+  async function getJwk(kid) {
+    const metadata = await discover();
+    const jwksUrl = browserUrl(metadata.jwks_uri);
+    if (typeof kid !== 'string' || !kid) return { jwk: null, jwksUrl };
+    if (!jwks.fresh) await jwks.reload();
+    let jwk = jwks.jwks().keys.find(key => key.kid === kid);
+    if (!jwk) {
+      await jwks.reload();
+      jwk = jwks.jwks().keys.find(key => key.kid === kid);
+    }
+    return { jwk: jwk ?? null, jwksUrl };
   }
 
   async function begin(returnTo) {
@@ -137,5 +151,5 @@ export function createOidc(config, { fetcher = globalThis.fetch } = {}) {
     return payload.sid;
   }
 
-  return { begin, callback, logoutUrl, verifyLogout };
+  return { issuer, clientId: config.clientId, getJwk, begin, callback, logoutUrl, verifyLogout };
 }
