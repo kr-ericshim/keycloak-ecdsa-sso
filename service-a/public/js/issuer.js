@@ -127,7 +127,7 @@ function renderList() {
   const list = $("#cert-list");
   $("#list-count").textContent = state.items.length ? `${state.items.length}건` : "";
   if (!state.items.length) {
-    list.replaceChildren(el("li", { class: "cert-list-empty muted", text: "아직 발급한 증명서가 없습니다. 왼쪽 양식으로 첫 증명서를 발급해 보세요." }));
+    list.replaceChildren(el("li", { class: "cert-list-empty muted", text: "아직 발급한 증명서가 없습니다. 증명서 발급 양식으로 첫 증명서를 만들어 보세요." }));
     return;
   }
   list.replaceChildren(...state.items.map((c) => {

@@ -74,6 +74,8 @@ Keycloak을 이용하여 두 개의 웹 서비스에 SSO(Single Sign-On)를 적�
 | B (:3002) | 서명 검증소 | 증명서를 올리면 A의 공개키로 서명을 검증하고, 타원곡선 연산 과정(u1, u2, R)을 단계별로 공개. 위변조 탐지 | 공개키 곡선 위 검사, ECDSA 검증(직접 구현과 라이브러리 교차 확인) |
 | Keycloak (:8080) | IdP | realm `crypto-sso`, OIDC Authorization Code + PKCE(S256) | ID/Access 토큰 ES256(ECDSA P-256) 서명 |
 
+Keycloak 로그인 화면은 커스텀 테마 `keycloak/themes/crypto-sso`로 바꿨다. A나 B의 화면이 아니라 두 서비스가 함께 쓰는 "통합 인증" 창구라서 중립색을 쓰고, 어느 서비스가 로그인을 요청했는지(client)만 그 서비스 색으로 표시한다.
+
 시연 흐름: A에서 로그인 → 증명서 발급 → "검증소에서 확인"으로 B 이동(추가 로그인 없음) → 검증 성공 → 내용을 한 글자 바꿔 다시 검증 → 위조 탐지 → 로그아웃 후 A·B 모두 인증 요구.
 
 ### 구현 환경

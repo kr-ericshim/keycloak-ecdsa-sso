@@ -174,7 +174,7 @@ export function renderSessionStrip(me, { peerName }) {
   const authMs = Date.parse(s.authTime);
   const loginMs = Date.parse(s.loginAt);
   const gapSec = Number.isFinite(authMs) && Number.isFinite(loginMs) ? Math.round((loginMs - authMs) / 1000) : null;
-  const reused = gapSec != null && gapSec > 5;
+  const reused = gapSec != null && gapSec >= 2;
 
   const lead = reused
     ? `이 서비스에 세션이 생긴 시각이 Keycloak 인증 시각보다 ${gapSec}초 늦습니다. 이미 있던 SSO 세션으로 들어왔고, 비밀번호를 다시 입력하지 않았다는 뜻입니다.`

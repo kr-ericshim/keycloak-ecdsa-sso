@@ -21,7 +21,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./keycloak/realm-crypto-sso.json:/opt/keycloak/data/import/realm-crypto-sso.json:ro
+      - ./keycloak/realm-crypto-sso.json:/opt/keycloak/data/import/crypto-sso-realm.json:ro
+      - ./keycloak/themes/crypto-sso:/opt/keycloak/themes/crypto-sso:ro
       - keycloak-data:/opt/keycloak/data
     healthcheck:
       test: ["CMD", "bash", "-ec", "{ printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000"]

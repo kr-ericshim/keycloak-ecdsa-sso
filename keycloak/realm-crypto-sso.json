@@ -16,11 +16,21 @@
         "name": "ecdsa-p256",
         "providerId": "ecdsa-generated",
         "config": {
-          "priority": ["100"],
-          "enabled": ["true"],
-          "active": ["true"],
-          "algorithm": ["ES256"],
-          "ecdsaEllipticCurveKey": ["P-256"]
+          "priority": [
+            "100"
+          ],
+          "enabled": [
+            "true"
+          ],
+          "active": [
+            "true"
+          ],
+          "algorithm": [
+            "ES256"
+          ],
+          "ecdsaEllipticCurveKey": [
+            "P-256"
+          ]
         }
       }
     ]
@@ -39,9 +49,17 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": false,
-      "redirectUris": ["${SERVICE_A_BASE_URL}/callback"],
-      "webOrigins": ["${SERVICE_A_BASE_URL}"],
-      "defaultClientScopes": ["profile", "email", "basic"],
+      "redirectUris": [
+        "${SERVICE_A_BASE_URL}/callback"
+      ],
+      "webOrigins": [
+        "${SERVICE_A_BASE_URL}"
+      ],
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "basic"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "${SERVICE_A_BASE_URL}/*",
@@ -65,9 +83,17 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": false,
-      "redirectUris": ["${SERVICE_B_BASE_URL}/callback"],
-      "webOrigins": ["${SERVICE_B_BASE_URL}"],
-      "defaultClientScopes": ["profile", "email", "basic"],
+      "redirectUris": [
+        "${SERVICE_B_BASE_URL}/callback"
+      ],
+      "webOrigins": [
+        "${SERVICE_B_BASE_URL}"
+      ],
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "basic"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "${SERVICE_B_BASE_URL}/*",
@@ -88,7 +114,14 @@
       "lastName": "Kim",
       "email": "alice@example.com",
       "requiredActions": [],
-      "credentials": [{ "type": "password", "value": "alice-dev-password", "temporary": false }]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alice-dev-password",
+          "temporary": false
+        }
+      ],
+      "id": "0b1c6a52-6f0e-4d5a-9a43-3c1e2a7d0a01"
     },
     {
       "username": "bob",
@@ -98,7 +131,20 @@
       "lastName": "Lee",
       "email": "bob@example.com",
       "requiredActions": [],
-      "credentials": [{ "type": "password", "value": "bob-dev-password", "temporary": false }]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bob-dev-password",
+          "temporary": false
+        }
+      ],
+      "id": "0b1c6a52-6f0e-4d5a-9a43-3c1e2a7d0b02"
     }
-  ]
+  ],
+  "loginTheme": "crypto-sso",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "ko"
+  ],
+  "defaultLocale": "ko"
 }
