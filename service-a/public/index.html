@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>서명 발급소 · 서비스 A</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23b8322a' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/issuer.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/issuer.js"></script>
+</head>
+<body data-service="A">
+
+  <div class="gate" data-gate="loading">
+    <p class="muted"><span class="spinner" aria-hidden="true"></span>로그인 상태를 확인하고 있습니다…</p>
+  </div>
+
+  <div class="gate" data-gate="loggedOut" hidden>
+    <div class="gate-card">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">發</span>
+        <span><span class="brand-name">서명 발급소</span><br><span class="brand-sub">서비스 A · ECDSA P-256 증명서 발급</span></span>
+      </div>
+      <h1>로그아웃되었습니다</h1>
+      <p>Keycloak SSO 세션이 끝났습니다. 서명 검증소에도 다시 로그인해야 들어갈 수 있습니다.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="/login">다시 로그인</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="gate" data-gate="error" hidden>
+    <div class="gate-card">
+      <h1>서버에 연결하지 못했습니다</h1>
+      <p>서비스 A 서버나 Keycloak이 실행 중인지 확인한 뒤 다시 시도하세요.</p>
+      <div class="actions"><button class="btn" type="button" onclick="location.reload()">다시 시도</button></div>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">發</span>
+        <span>
+          <span class="brand-name">서명 발급소</span><br>
+          <span class="brand-sub">서비스 A · localhost:3001</span>
+        </span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <a class="peer-link" id="peer-link" href="#">서명 검증소로 이동 ↗</a>
+      <div class="identity" id="identity"></div>
+    </header>
+
+    <main class="page">
+      <div class="issuer-layout">
+
+        <section class="issuer-side" aria-labelledby="issue-title">
+          <div class="panel">
+            <div class="panel-head">
+              <h2 id="issue-title">증명서 발급</h2>
+            </div>
+            <form id="issue-form" novalidate>
+              <div class="field">
+                <label for="f-type">종류</label>
+                <select class="input" id="f-type" name="type">
+                  <option>수료증</option>
+                  <option>참가확인서</option>
+                  <option>재직증명서</option>
+                  <option>졸업증명서</option>
+                  <option>기타 증명서</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="f-recipient">받는 사람</label>
+                <input class="input" id="f-recipient" name="recipientName" maxlength="200" autocomplete="off" required>
+                <span class="error" id="e-recipient"></span>
+              </div>
+              <div class="field">
+                <label for="f-title">제목</label>
+                <input class="input" id="f-title" name="title" maxlength="200" placeholder="암호와 인증 SSO 프로젝트 수료" autocomplete="off" required>
+                <span class="error" id="e-title"></span>
+              </div>
+              <div class="field">
+                <label for="f-desc">내용 <span class="faint">(선택)</span></label>
+                <textarea class="input" id="f-desc" name="description" maxlength="2000" placeholder="Keycloak 기반 SSO와 ECDSA 전자서명 실습을 마쳤음을 증명합니다."></textarea>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit" id="issue-btn">서명하고 발급</button>
+              <p class="form-note">발급 버튼을 누르면 서버가 내용을 정규화해 SHA-256 해시를 만들고, 발급소 개인키로 ECDSA 서명합니다.</p>
+            </form>
+          </div>
+
+          <div class="panel key-panel">
+            <div class="panel-head">
+              <h2>발급소 공개키</h2>
+              <a class="small-link" href="/api/issuer-key" target="_blank" rel="noopener">JSON 보기</a>
+            </div>
+            <p class="key-lead">개인키 <code>d</code>는 서버 밖으로 나가지 않습니다. 검증소는 아래 공개키 <code>Q = d·G</code>만 받아서 서명을 확인합니다.</p>
+            <dl class="kv" id="key-info">
+              <dt>상태</dt><dd class="muted">불러오는 중…</dd>
+            </dl>
+          </div>
+        </section>
+
+        <section class="issuer-main" aria-labelledby="preview-title">
+          <div class="preview-head">
+            <h2 id="preview-title">증명서</h2>
+            <div class="preview-actions" id="preview-actions" hidden>
+              <button class="btn btn-sm" type="button" id="download-btn">JSON 내려받기</button>
+              <a class="btn btn-sm" id="verify-link" href="#">검증소에서 확인 ↗</a>
+            </div>
+          </div>
+
+          <div id="certificate-slot">
+            <div class="cert-empty">
+              <p><strong>아직 고른 증명서가 없습니다.</strong></p>
+              <p class="muted">왼쪽에서 증명서를 발급하면 이곳에 서명된 증명서가 나타납니다.</p>
+            </div>
+          </div>
+
+          <details class="canonical" id="canonical" hidden>
+            <summary>서명된 원문 보기 (정규화한 JSON)</summary>
+            <p class="muted">키를 사전순으로 정렬하고 공백을 없앤 바이트에 SHA-256 해시를 적용한 뒤 서명했습니다. 한 글자라도 바뀌면 해시가 완전히 달라집니다.</p>
+            <pre id="canonical-text"></pre>
+          </details>
+
+          <div class="list-block">
+            <div class="panel-head">
+              <h2>내가 발급한 증명서</h2>
+              <p id="list-count"></p>
+            </div>
+            <ul class="cert-list" id="cert-list">
+              <li class="cert-list-empty muted">불러오는 중…</li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <section class="session-strip" id="session-strip" aria-label="SSO 세션 정보"></section>
+    </main>
+  </div>
+</body>
+</html>

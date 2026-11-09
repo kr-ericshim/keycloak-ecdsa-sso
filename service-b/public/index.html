@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>서명 검증소 · 서비스 B</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 24 C 10 2, 16 2, 18 14 S 26 28, 30 6' fill='none' stroke='%232f4fa8' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/verifier.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/verifier.js"></script>
+</head>
+<body data-service="B">
+
+  <div class="gate" data-gate="loading">
+    <p class="muted"><span class="spinner" aria-hidden="true"></span>로그인 상태를 확인하고 있습니다…</p>
+  </div>
+
+  <div class="gate" data-gate="loggedOut" hidden>
+    <div class="gate-card">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">檢</span>
+        <span><span class="brand-name">서명 검증소</span><br><span class="brand-sub">서비스 B · ECDSA 서명 검증</span></span>
+      </div>
+      <h1>로그아웃되었습니다</h1>
+      <p>Keycloak SSO 세션이 끝났습니다. 서명 발급소에도 다시 로그인해야 들어갈 수 있습니다.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="/login">다시 로그인</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="gate" data-gate="error" hidden>
+    <div class="gate-card">
+      <h1>서버에 연결하지 못했습니다</h1>
+      <p>서비스 B 서버나 Keycloak이 실행 중인지 확인한 뒤 다시 시도하세요.</p>
+      <div class="actions"><button class="btn" type="button" onclick="location.reload()">다시 시도</button></div>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">檢</span>
+        <span>
+          <span class="brand-name">서명 검증소</span><br>
+          <span class="brand-sub">서비스 B · localhost:3002</span>
+        </span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <a class="peer-link" id="peer-link" href="#">서명 발급소로 이동 ↗</a>
+      <div class="identity" id="identity"></div>
+    </header>
+
+    <main class="page">
+      <div class="verifier-layout">
+
+        <section class="verifier-side" aria-labelledby="input-title">
+          <div class="panel">
+            <div class="panel-head">
+              <h2 id="input-title">증명서 넣기</h2>
+            </div>
+
+            <label class="dropzone" id="dropzone" for="file-input">
+              <input type="file" id="file-input" accept="application/json,.json" class="sr-only">
+              <span class="dropzone-title">JSON 파일을 끌어다 놓거나 눌러서 고르세요</span>
+              <span class="dropzone-sub">발급소에서 내려받은 <code>certificate-….json</code></span>
+            </label>
+
+            <div class="field">
+              <label for="cert-input">또는 내용 붙여넣기</label>
+              <textarea class="input mono-input" id="cert-input" spellcheck="false" placeholder='{"version":1,"payload":{…},"signature":{…}}'></textarea>
+              <span class="error" id="e-cert"></span>
+            </div>
+
+            <div class="input-actions">
+              <button class="btn btn-primary" type="button" id="verify-btn">서명 검증</button>
+              <button class="btn" type="button" id="tamper-btn" title="받는 사람 이름의 마지막 글자를 바꿉니다">위조해 보기</button>
+              <button class="btn btn-ghost" type="button" id="clear-btn">비우기</button>
+            </div>
+            <p class="tamper-note" id="tamper-note" hidden></p>
+          </div>
+
+          <div class="panel history-panel">
+            <div class="panel-head">
+              <h2>최근 검증 기록</h2>
+            </div>
+            <ul class="history" id="history">
+              <li class="muted history-empty">불러오는 중…</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="verifier-main" aria-labelledby="result-title" aria-live="polite">
+          <h2 id="result-title" class="sr-only">검증 결과</h2>
+
+          <div id="result-empty" class="result-empty notebook">
+            <p class="empty-title">증명서를 넣으면 서명을 확인하는 계산을 한 줄씩 보여줍니다.</p>
+            <ol class="empty-steps">
+              <li>내용을 정규화해 <code>e = SHA-256(m)</code>을 다시 계산합니다.</li>
+              <li><code>w = s⁻¹</code>, <code>u₁ = e·w</code>, <code>u₂ = r·w</code> (mod n)을 구합니다.</li>
+              <li>곡선 위 점 <code>R = u₁·G + u₂·Q</code>를 계산합니다.</li>
+              <li><code>R.x mod n</code>이 서명값 <code>r</code>과 같으면 진짜입니다.</li>
+            </ol>
+            <p class="muted">발급소의 "검증소에서 확인" 버튼으로 들어오면 자동으로 검증합니다.</p>
+          </div>
+
+          <div id="result" hidden>
+            <div class="verdict" id="verdict"></div>
+            <div class="result-grid">
+              <div>
+                <h3 class="block-title">검증 단계</h3>
+                <ol class="steps" id="steps"></ol>
+              </div>
+              <div>
+                <h3 class="block-title">증명서 내용</h3>
+                <dl class="kv payload-kv" id="payload-kv"></dl>
+              </div>
+            </div>
+
+            <div class="notebook math" id="math">
+              <div class="math-head">
+                <h3 class="block-title">계산 노트 · ECDSA 검증</h3>
+                <div class="math-chips" id="math-chips"></div>
+              </div>
+              <div class="math-body">
+                <div class="equations" id="equations"></div>
+                <figure class="curve-figure">
+                  <svg id="curve" viewBox="0 0 320 260" role="img" aria-labelledby="curve-cap"></svg>
+                  <figcaption id="curve-cap">실수 위 개념도입니다. 실제 P-256은 유한체 F<sub>p</sub> 위의 점이라 그림으로 그릴 수 없지만, 점 덧셈 규칙(직선이 곡선과 만나는 세 번째 점을 x축에 뒤집기)은 같습니다.</figcaption>
+                </figure>
+              </div>
+              <details class="curve-params">
+                <summary>P-256 곡선 상수 보기</summary>
+                <dl class="kv" id="curve-params"></dl>
+              </details>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="session-strip" id="session-strip" aria-label="SSO 세션 정보"></section>
+    </main>
+  </div>
+</body>
+</html>
