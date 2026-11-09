@@ -52,14 +52,14 @@ Keycloak을 이용하여 두 개의 웹 서비스에 SSO(Single Sign-On)를 적�
 
 ## 5. 완료 확인 목록
 
-- [ ] 웹 서비스 A 구현 및 기능 설명 정리
-- [ ] 웹 서비스 B 구현 및 기능 설명 정리
-- [ ] Keycloak을 이용한 두 서비스 인증 구현
+- [x] 웹 서비스 A 구현 및 기능 설명 정리
+- [x] 웹 서비스 B 구현 및 기능 설명 정리
+- [x] Keycloak을 이용한 두 서비스 인증 구현
 - [ ] 서비스 A 로그인 동작 검증 및 화면 캡처
 - [ ] 서비스 B 추가 로그인 없는 SSO 접속 검증 및 화면 캡처
 - [ ] 로그아웃 또는 새로운 브라우저 세션에서 인증 필요 여부 검증 및 화면 캡처
 - [ ] 시스템 구성도 작성
-- [ ] 구현 환경 및 Keycloak 설정 정리
+- [x] 구현 환경 및 Keycloak 설정 정리
 - [ ] SSO 동작 원리 및 실습 소감 정리
 - [ ] PPT 10~20장 내외 작성
 - [ ] 마지막 슬라이드에 GitHub 주소 또는 프로젝트 공유 링크 기재
@@ -88,6 +88,33 @@ API 계약은 [docs/API.md](docs/API.md)에 정리했다.
 
 ### 아직 정하지 않은 것
 
-- 클라우드 이전 대상과 시점
+- 배포: VPS + `ericshim.me` 서브도메인(예: idp / sign / verify), Caddy로 HTTPS. VPS 준비 후 진행
 
 제출 마감일과 가점 배점은 제공된 과제 안내에 명시되어 있지 않다.
+
+## 7. 실행 방법 (로컬)
+
+필요한 것: Docker Desktop, Node.js 22 이상.
+
+```bash
+npm install
+docker compose up -d keycloak     # Keycloak :8080, realm 자동 import (첫 기동 1분 정도)
+npm run dev:a                     # 서명 발급소 http://localhost:3001
+npm run dev:b                     # 서명 검증소 http://localhost:3002 (다른 터미널)
+npm test                          # 서명·검증·ECC 단위 테스트
+```
+
+- 시연 계정은 `alice`, `bob`이다. 비밀번호는 [.env.example](.env.example) 맨 아래 주석에 있다(개발용 테스트 값).
+- Keycloak 관리 콘솔: http://localhost:8080/admin (계정은 `.env.example`의 `KC_BOOTSTRAP_ADMIN_*`)
+- 서비스 컨테이너까지 한 번에 띄우려면 `docker compose --profile full up -d --build`를 쓴다.
+- realm 설정을 바꾼 뒤에는 `docker compose down -v`로 Keycloak 데이터를 지워야 다시 import된다.
+
+## 8. 검증 결과 (2026-11-09, 로컬)
+
+| 시나리오 | 결과 |
+|---|---|
+| A 접속 → Keycloak 로그인 → A 진입 | 통과 |
+| A에서 "검증소에서 확인" → B 진입 | 비밀번호 입력 없이 진입. B의 auth_time이 A 로그인 시각과 같음 |
+| 발급한 증명서 검증 | 6단계 통과, 직접 구현과 Node crypto 모두 통과 |
+| 받는 사람 한 글자 변경 후 검증 | 해시 재계산, ECDSA 검증 단계에서 실패 → 위조 판정 |
+| B에서 로그아웃 → A 접속 | back-channel logout으로 A 세션도 삭제, Keycloak 로그인 화면 표시 |
