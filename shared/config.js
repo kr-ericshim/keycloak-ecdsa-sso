@@ -18,6 +18,7 @@ export function loadConfig(service, directory) {
     clientSecret: process.env.CLIENT_SECRET || `service-${service.toLowerCase()}-dev-secret`,
     sessionSecret: process.env.SESSION_SECRET || `local-only-service-${service.toLowerCase()}-replace-this-session-secret`,
     cookieName: service === 'A' ? 'sid_a' : 'sid_b',
+    oidcTimeoutMs: Number(process.env.OIDC_TIMEOUT_MS) || 15_000,
     issuerKeyUrl: process.env.ISSUER_KEY_URL || 'http://localhost:3001/api/issuer-key',
     // 리버스 프록시(Caddy) 뒤에서 X-Forwarded-* 를 믿을 홉 수. 로컬 개발은 비워 둔다.
     trustProxy: process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY : false,

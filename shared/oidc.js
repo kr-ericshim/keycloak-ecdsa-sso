@@ -17,6 +17,8 @@ function equalSecret(actual, expected) {
 export function createOidc(config, { fetcher = globalThis.fetch } = {}) {
   const issuer = `${config.publicUrl}/realms/${encodeURIComponent(config.realm)}`;
   const redirectUri = `${config.baseUrl}/callback`;
+  // 1코어 서버에서 Keycloak 이 첫 요청을 처리할 때 5초를 넘길 수 있어 기본 15초로 둔다.
+  const timeoutMs = config.oidcTimeoutMs || 15_000;
   let discoveryPromise;
   let jwks;
 
@@ -41,7 +43,7 @@ export function createOidc(config, { fetcher = globalThis.fetch } = {}) {
     if (!discoveryPromise) {
       discoveryPromise = (async () => {
         const response = await fetcher(serverUrl(`${issuer}/.well-known/openid-configuration`), {
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(timeoutMs),
         });
         if (!response.ok) throw new Error('Keycloak discovery에 실패했습니다.');
         const metadata = await response.json();
@@ -50,7 +52,7 @@ export function createOidc(config, { fetcher = globalThis.fetch } = {}) {
           if (typeof metadata[name] !== 'string') throw new Error(`발견 문서에 ${name}가 없습니다.`);
         }
         jwks = createRemoteJWKSet(new URL(serverUrl(metadata.jwks_uri)), {
-          timeoutDuration: 5000, [customFetch]: fetcher,
+          timeoutDuration: timeoutMs, [customFetch]: fetcher,
         });
         return metadata;
       })().catch(error => { discoveryPromise = undefined; throw error; });
@@ -85,7 +87,7 @@ export function createOidc(config, { fetcher = globalThis.fetch } = {}) {
     }
     const metadata = await discover();
     const response = await fetcher(serverUrl(metadata.token_endpoint), {
-      method: 'POST', signal: AbortSignal.timeout(5000),
+      method: 'POST', signal: AbortSignal.timeout(timeoutMs),
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'authorization_code', code: query.code,
         client_id: config.clientId, client_secret: config.clientSecret,
