@@ -23,3 +23,7 @@ npm-debug.log*
 
 # 운영 비밀값
 deploy/production.env
+
+# 발표 준비 작업물 (로컬 전용)
+docs/screenshots/
+docs/PPT-OUTLINE.md
