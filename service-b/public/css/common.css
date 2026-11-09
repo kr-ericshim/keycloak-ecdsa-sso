@@ -258,6 +258,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 }
 .session-strip h2 { font-size: var(--text-md); }
 .session-strip .lead { font-size: var(--text-sm); color: var(--fg-muted); margin-top: var(--s-2); }
+.session-strip .token-link { display: inline-block; margin-top: var(--s-3); font-size: var(--text-sm); font-weight: 600; }
 .session-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s-4); }
 .session-cell { border: 1px solid var(--border); border-radius: var(--r-control); padding: var(--s-3) var(--s-4); background: var(--surface); }
 .session-cell .label { font-size: var(--text-xs); color: var(--fg-muted); }

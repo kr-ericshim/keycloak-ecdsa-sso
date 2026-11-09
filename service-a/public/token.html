@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로그인 토큰 해부</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='12' width='8' height='8' rx='2' fill='%23707a85'/%3E%3Crect x='12' y='12' width='8' height='8' rx='2' fill='%232f6b52'/%3E%3Crect x='21' y='12' width='8' height='8' rx='2' fill='%23b8322a'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/token.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/token.js"></script>
+</head>
+<body>
+
+  <div class="gate" data-gate="loading">
+    <p class="muted"><span class="spinner" aria-hidden="true"></span>로그인 토큰을 불러오고 있습니다…</p>
+  </div>
+
+  <div class="gate" data-gate="loggedOut" hidden>
+    <div class="gate-card">
+      <h1>로그아웃되었습니다</h1>
+      <p>다시 로그인하면 새 토큰을 해부해 볼 수 있습니다.</p>
+      <div class="actions"><a class="btn btn-primary" href="/login?returnTo=/token.html">다시 로그인</a></div>
+    </div>
+  </div>
+
+  <div class="gate" data-gate="error" hidden>
+    <div class="gate-card">
+      <h1>서버에 연결하지 못했습니다</h1>
+      <p>잠시 후 다시 시도하세요.</p>
+      <div class="actions"><button class="btn" type="button" onclick="location.reload()">다시 시도</button></div>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <a class="brand brand-link" href="/">
+        <span class="brand-mark" aria-hidden="true" id="brand-mark"></span>
+        <span>
+          <span class="brand-name" id="brand-name"></span><br>
+          <span class="brand-sub">로그인 토큰 해부</span>
+        </span>
+      </a>
+      <div class="topbar-spacer"></div>
+      <a class="peer-link" href="/">← 서비스로 돌아가기</a>
+      <div class="identity" id="identity"></div>
+    </header>
+
+    <main class="page token-page">
+      <section class="intro">
+        <h1>이 로그인은 정말 Keycloak이 보증한 걸까?</h1>
+        <p>로그인하면 Keycloak이 이 서비스에 <strong>ID 토큰</strong>을 건넵니다. 토큰을 세 조각으로 나눠 읽고, 마지막 조각에 찍힌 서명이 Keycloak의 공개키와 맞는지 직접 대조해 봅니다.</p>
+      </section>
+
+      <!-- 1. 토큰 자체 -->
+      <section class="jwt-strip" aria-label="ID 토큰 문자열">
+        <div class="jwt-line" id="jwt-line"></div>
+        <ol class="jwt-legend">
+          <li class="seg-h"><span class="dot"></span>헤더 <span class="faint" id="len-h"></span></li>
+          <li class="seg-p"><span class="dot"></span>내용 <span class="faint" id="len-p"></span></li>
+          <li class="seg-s"><span class="dot"></span>서명 <span class="faint" id="len-s"></span></li>
+        </ol>
+      </section>
+
+      <!-- 2. 세 조각 펼치기 -->
+      <section class="pieces">
+        <article class="piece seg-h">
+          <header><span class="piece-no">1</span><h2>헤더</h2><p>어떻게 서명했나</p></header>
+          <dl class="facts" id="facts-h"></dl>
+        </article>
+        <article class="piece seg-p">
+          <header><span class="piece-no">2</span><h2>내용</h2><p>누구에 대한 토큰인가</p></header>
+          <dl class="facts" id="facts-p"></dl>
+        </article>
+        <article class="piece seg-s">
+          <header><span class="piece-no">3</span><h2>서명</h2><p>Keycloak이 찍은 도장</p></header>
+          <dl class="facts" id="facts-s"></dl>
+          <p class="piece-note">헤더와 내용을 이어 붙인 바이트에 Keycloak이 개인키로 서명한 값입니다. 64바이트를 반으로 나눈 앞쪽이 <b>r</b>, 뒤쪽이 <b>s</b>입니다.</p>
+        </article>
+      </section>
+
+      <!-- 3. 도장 대조 -->
+      <section class="match" id="match" aria-live="polite">
+        <div class="match-head">
+          <div>
+            <h2>도장 대조</h2>
+            <p class="muted" id="match-lead"></p>
+          </div>
+          <div class="verdict-stamp" id="verdict-stamp" aria-hidden="true"></div>
+        </div>
+
+        <div class="compare">
+          <div class="compare-row">
+            <span class="compare-label">토큰에 찍힌 서명 <b>r</b></span>
+            <code class="hexline" id="hex-r"></code>
+          </div>
+          <div class="compare-row">
+            <span class="compare-label">공개키로 다시 계산한 값</span>
+            <code class="hexline" id="hex-rx"></code>
+          </div>
+        </div>
+
+        <ul class="checks" id="checks"></ul>
+
+        <div class="keybox">
+          <span class="keybox-label">대조에 쓴 공개키</span>
+          <span id="key-desc"></span>
+          <a id="jwks-link" target="_blank" rel="noopener">Keycloak 공개키 목록(JWKS) 보기 ↗</a>
+        </div>
+
+        <details class="workings">
+          <summary>계산 자세히 보기</summary>
+          <p class="muted">ECDSA 검증은 해시 <code>e</code>와 서명 <code>(r, s)</code>, 공개키 <code>Q</code>로 곡선 위의 점 <code>R</code>을 하나 계산합니다. <code>R</code>의 x좌표가 <code>r</code>과 같으면 이 개인키의 주인이 이 내용에 서명했다는 뜻입니다.</p>
+          <dl class="kv workings-kv" id="workings"></dl>
+        </details>
+      </section>
+
+      <!-- 4. 위조 시연 -->
+      <section class="tamper panel" aria-labelledby="tamper-title">
+        <div class="tamper-text">
+          <h2 id="tamper-title">내용을 바꾸면?</h2>
+          <p class="muted">서명은 그대로 두고 토큰 내용의 한 항목만 바꿔서 다시 대조합니다. 누군가 토큰을 가로채 다른 사람 행세를 하려 할 때와 같습니다.</p>
+        </div>
+        <form class="tamper-form" id="tamper-form" novalidate>
+          <div class="field">
+            <label for="t-claim">바꿀 항목</label>
+            <select class="input" id="t-claim">
+              <option value="preferred_username">아이디</option>
+              <option value="name">이름</option>
+              <option value="email">이메일</option>
+              <option value="sub">사용자 ID</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="t-value">바꿀 값</label>
+            <input class="input" id="t-value" maxlength="200" autocomplete="off">
+            <span class="error" id="e-value"></span>
+          </div>
+          <div class="tamper-actions">
+            <button class="btn btn-primary" type="submit" id="tamper-btn">바꿔서 다시 대조</button>
+            <button class="btn btn-ghost" type="button" id="reset-btn" hidden>원래 토큰으로</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="session-strip" id="session-strip" aria-label="SSO 세션 정보"></section>
+    </main>
+  </div>
+</body>
+</html>

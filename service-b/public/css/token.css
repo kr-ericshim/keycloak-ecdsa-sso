@@ -1,0 +1,166 @@
+/* 로그인 토큰 해부 화면 (A, B 공통). 세 조각 색: 헤더=잉크, 내용=서비스 색, 서명=인주 */
+
+.token-page { max-width: 1080px; }
+.brand-link { text-decoration: none; color: inherit; }
+
+.seg-h { --seg: var(--ink-600); --seg-tint: var(--paper-2); }
+.seg-p { --seg: var(--accent); --seg-tint: var(--accent-tint); }
+.seg-s { --seg: var(--seal-red); --seg-tint: var(--seal-red-tint); }
+
+.intro { max-width: 62ch; margin-bottom: var(--s-8); }
+.intro h1 { font-size: var(--text-2xl); font-weight: 750; letter-spacing: -0.03em; line-height: 1.25; margin-bottom: var(--s-3); }
+.intro p { color: var(--fg-muted); font-size: 16px; }
+
+/* ---------- 1. 토큰 문자열 ---------- */
+
+.jwt-strip {
+  background: var(--ink-900);
+  color: oklch(0.92 0.01 160);
+  border-radius: var(--r-panel);
+  padding: var(--s-5) var(--s-6) var(--s-4);
+  margin-bottom: var(--s-6);
+}
+.jwt-line {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.7;
+  word-break: break-all;
+}
+.jwt-line .part { padding: 2px 4px; border-radius: 4px; }
+.jwt-line .part-h { color: oklch(0.86 0.02 250); background: oklch(1 0 0 / 0.08); }
+.jwt-line .part-p { color: oklch(0.86 0.1 160); background: oklch(0.6 0.1 160 / 0.18); }
+body[data-service="B"] .jwt-line .part-p { color: oklch(0.85 0.08 258); background: oklch(0.55 0.13 258 / 0.22); }
+.jwt-line .part-s { color: oklch(0.82 0.12 28); background: oklch(0.55 0.19 28 / 0.2); }
+.jwt-line .gap { color: oklch(0.6 0.01 160); letter-spacing: 0.1em; }
+.jwt-line .dotsep { color: oklch(1 0 0); font-weight: 700; padding: 0 2px; }
+.jwt-line .changed { outline: 1.5px dashed oklch(0.82 0.12 28); outline-offset: 1px; }
+
+.jwt-legend { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); margin: var(--s-3) 0 0; padding: 0; font-size: var(--text-xs); }
+.jwt-legend li { display: inline-flex; align-items: center; gap: 6px; color: oklch(0.85 0.01 160); }
+.jwt-legend .faint { color: oklch(0.65 0.01 160); font-family: var(--font-mono); }
+.jwt-legend .dot { width: 8px; height: 8px; border-radius: 2px; background: var(--seg); }
+.jwt-legend .seg-h .dot { background: oklch(0.75 0.02 250); }
+
+/* ---------- 2. 세 조각 ---------- */
+
+.pieces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); margin-bottom: var(--s-8); }
+.piece {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--seg);
+  border-radius: var(--r-panel);
+  padding: var(--s-5);
+}
+.piece header { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--s-3); align-items: baseline; margin-bottom: var(--s-4); }
+.piece-no {
+  grid-row: span 2;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--seg-tint); color: var(--seg);
+  font-weight: 700; font-size: var(--text-sm);
+  align-self: center;
+}
+.piece h2 { font-size: var(--text-md); }
+.piece header p { font-size: var(--text-xs); color: var(--fg-muted); }
+.piece-note { margin-top: var(--s-4); font-size: var(--text-xs); color: var(--fg-muted); line-height: 1.6; }
+
+.facts { margin: 0; display: grid; gap: var(--s-3); }
+.facts > div { min-width: 0; }
+.facts dt { font-size: var(--text-xs); color: var(--fg-muted); }
+.facts dd { margin: 1px 0 0; font-weight: 600; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.facts dd small { display: block; font-weight: 400; color: var(--fg-muted); font-size: var(--text-xs); }
+.facts dd.mono-dd { font-family: var(--font-mono); font-weight: 500; font-size: 12.5px; }
+.facts > div.is-changed { background: var(--danger-bg); margin: -4px -8px; padding: 4px 8px; border-radius: var(--r-control); }
+.facts > div.is-changed dd { color: oklch(0.42 0.16 28); }
+.facts > div.is-changed dd small { color: oklch(0.5 0.12 28); }
+
+/* ---------- 3. 도장 대조 ---------- */
+
+.match {
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  padding: var(--s-6);
+  margin-bottom: var(--s-6);
+}
+.match.is-valid { border-color: oklch(0.5 0.13 150 / 0.45); }
+.match.is-invalid { border-color: oklch(0.52 0.19 28 / 0.45); }
+.match-head { display: flex; justify-content: space-between; gap: var(--s-6); align-items: center; margin-bottom: var(--s-5); }
+.match-head h2 { font-size: var(--text-xl); letter-spacing: -0.02em; }
+.match-head p { margin-top: var(--s-1); max-width: 56ch; }
+
+.verdict-stamp {
+  flex: none;
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  border: 4px double currentColor;
+  display: grid; place-items: center;
+  font-family: var(--font-doc);
+  font-weight: 700;
+  font-size: 22px;
+  transform: rotate(-8deg);
+}
+.is-valid .verdict-stamp { color: var(--ok-green); }
+.is-invalid .verdict-stamp { color: var(--seal-red); }
+.verdict-stamp.fresh { animation: stamp-in 380ms var(--ease-out) both; }
+@keyframes stamp-in { 0% { transform: rotate(-8deg) scale(1.5); opacity: 0; } 70% { transform: rotate(-8deg) scale(0.95); opacity: 1; } 100% { transform: rotate(-8deg) scale(1); } }
+
+.compare { display: grid; gap: var(--s-2); margin-bottom: var(--s-5); }
+.compare-row { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: var(--s-4); align-items: center; padding: var(--s-3) var(--s-4); background: var(--paper-1); border-radius: var(--r-control); }
+.compare-label { font-size: var(--text-sm); color: var(--fg-muted); }
+.hexline { font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.02em; display: grid; grid-template-columns: repeat(8, max-content); gap: 2px 6px; }
+.hexline .g { padding: 1px 2px; border-radius: 3px; }
+.hexline .g.eq { color: oklch(0.36 0.1 150); background: oklch(0.5 0.13 150 / 0.1); }
+.hexline .g.ne { color: oklch(0.42 0.16 28); background: oklch(0.52 0.19 28 / 0.12); }
+
+.checks { list-style: none; margin: 0 0 var(--s-5); padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.checks li {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: var(--surface);
+}
+.checks li::before { content: ""; width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; color: white; }
+.checks li.ok::before { content: "✓"; background: var(--ok-green); }
+.checks li.fail { border-color: oklch(0.52 0.19 28 / 0.4); color: oklch(0.42 0.16 28); background: var(--danger-bg); }
+.checks li.fail::before { content: "✕"; background: var(--seal-red); }
+
+.keybox { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-3); font-size: var(--text-sm); padding-top: var(--s-4); border-top: 1px solid var(--border); }
+.keybox-label { font-weight: 600; }
+#key-desc { color: var(--fg-muted); }
+.keybox a { font-size: var(--text-xs); }
+
+.workings { margin-top: var(--s-4); }
+.workings summary { cursor: pointer; font-size: var(--text-sm); font-weight: 600; color: var(--fg-muted); }
+.workings summary:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-control); }
+.workings[open] summary { margin-bottom: var(--s-3); }
+.workings > p { font-size: var(--text-sm); margin-bottom: var(--s-3); max-width: 70ch; }
+.workings-kv dd { font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+
+/* ---------- 4. 위조 시연 ---------- */
+
+.tamper { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--s-8); align-items: start; }
+.tamper-text h2 { margin-bottom: var(--s-2); }
+.tamper-text p { font-size: var(--text-sm); }
+.tamper-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 var(--s-3); }
+.tamper-form .field { margin-bottom: var(--s-3); }
+.tamper-actions { grid-column: 1 / -1; display: flex; gap: var(--s-2); flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .pieces { grid-template-columns: minmax(0, 1fr); }
+  .tamper { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .compare-row { grid-template-columns: minmax(0, 1fr); gap: var(--s-1); }
+  .hexline { grid-template-columns: repeat(4, max-content); }
+}
+@media (max-width: 560px) {
+  .intro h1 { font-size: var(--text-xl); }
+  .jwt-strip { padding: var(--s-4); }
+  .jwt-line { font-size: 13px; }
+  .match { padding: var(--s-4); }
+  .match-head { flex-direction: column-reverse; align-items: flex-start; }
+  .verdict-stamp { width: 76px; height: 76px; font-size: 18px; }
+  .tamper-form { grid-template-columns: minmax(0, 1fr); }
+}

@@ -189,6 +189,8 @@ export function renderSessionStrip(me, { peerName }) {
     el("div", {},
       el("h2", { text: "이 로그인 세션" }),
       el("p", { class: "lead", text: lead }),
+      window.location.pathname === "/token.html" ? null
+        : el("a", { class: "token-link", href: "/token.html", text: "이 로그인 토큰의 서명 직접 확인하기 →" }),
     ),
     el("div", { class: "session-grid" },
       cell("Keycloak 인증 시각 (auth_time)", fmtTime(s.authTime), true),
