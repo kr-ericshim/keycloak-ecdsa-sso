@@ -1,0 +1,12 @@
+{
+  "name": "crypto-sso-assignment",
+  "private": true,
+  "type": "module",
+  "workspaces": ["service-a", "service-b"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev:a": "npm run dev --workspace service-a",
+    "dev:b": "npm run dev --workspace service-b",
+    "test": "npm run test --workspaces"
+  }
+}

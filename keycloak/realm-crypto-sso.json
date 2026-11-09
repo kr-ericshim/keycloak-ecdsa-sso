@@ -1,0 +1,104 @@
+{
+  "realm": "crypto-sso",
+  "enabled": true,
+  "displayName": "Crypto SSO 실습",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "loginWithEmailAllowed": true,
+  "defaultSignatureAlgorithm": "ES256",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "ecdsa-p256",
+        "providerId": "ecdsa-generated",
+        "config": {
+          "priority": ["100"],
+          "enabled": ["true"],
+          "active": ["true"],
+          "algorithm": ["ES256"],
+          "ecdsaEllipticCurveKey": ["P-256"]
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "service-a",
+      "name": "서명 발급소",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${SERVICE_A_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": ["${SERVICE_A_BASE_URL}/callback"],
+      "webOrigins": ["${SERVICE_A_BASE_URL}"],
+      "defaultClientScopes": ["profile", "email", "basic"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${SERVICE_A_BASE_URL}/*",
+        "backchannel.logout.url": "${SERVICE_A_BACKCHANNEL_LOGOUT_URL}",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "id.token.signed.response.alg": "ES256",
+        "access.token.signed.response.alg": "ES256"
+      }
+    },
+    {
+      "clientId": "service-b",
+      "name": "서명 검증소",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${SERVICE_B_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": ["${SERVICE_B_BASE_URL}/callback"],
+      "webOrigins": ["${SERVICE_B_BASE_URL}"],
+      "defaultClientScopes": ["profile", "email", "basic"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${SERVICE_B_BASE_URL}/*",
+        "backchannel.logout.url": "${SERVICE_B_BACKCHANNEL_LOGOUT_URL}",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "id.token.signed.response.alg": "ES256",
+        "access.token.signed.response.alg": "ES256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Kim",
+      "email": "alice@example.com",
+      "requiredActions": [],
+      "credentials": [{ "type": "password", "value": "alice-dev-password", "temporary": false }]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Bob",
+      "lastName": "Lee",
+      "email": "bob@example.com",
+      "requiredActions": [],
+      "credentials": [{ "type": "password", "value": "bob-dev-password", "temporary": false }]
+    }
+  ]
+}

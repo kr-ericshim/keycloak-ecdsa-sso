@@ -1,0 +1,85 @@
+name: crypto-sso
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-admin-dev-password}
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      SERVICE_A_BASE_URL: ${SERVICE_A_BASE_URL:-http://localhost:3001}
+      SERVICE_B_BASE_URL: ${SERVICE_B_BASE_URL:-http://localhost:3002}
+      SERVICE_A_CLIENT_SECRET: ${SERVICE_A_CLIENT_SECRET:-service-a-dev-secret}
+      SERVICE_B_CLIENT_SECRET: ${SERVICE_B_CLIENT_SECRET:-service-b-dev-secret}
+      SERVICE_A_BACKCHANNEL_LOGOUT_URL: ${SERVICE_A_BACKCHANNEL_LOGOUT_URL:-http://host.docker.internal:3001/backchannel-logout}
+      SERVICE_B_BACKCHANNEL_LOGOUT_URL: ${SERVICE_B_BACKCHANNEL_LOGOUT_URL:-http://host.docker.internal:3002/backchannel-logout}
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./keycloak/realm-crypto-sso.json:/opt/keycloak/data/import/realm-crypto-sso.json:ro
+      - keycloak-data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD", "bash", "-ec", "{ printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep 'HTTP/1.0 200'; } 0<>/dev/tcp/localhost/9000"]
+      interval: 5s
+      timeout: 3s
+      start_period: 60s
+      retries: 30
+
+  service-a:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: service-a/Dockerfile
+    environment:
+      PORT: "3001"
+      BASE_URL: ${SERVICE_A_BASE_URL:-http://localhost:3001}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
+      KEYCLOAK_REALM: crypto-sso
+      CLIENT_ID: service-a
+      CLIENT_SECRET: ${SERVICE_A_CLIENT_SECRET:-service-a-dev-secret}
+      SESSION_SECRET: ${SERVICE_A_SESSION_SECRET:-local-only-service-a-replace-this-session-secret}
+      DATA_DIR: /app/service-a/data
+    ports:
+      - "${SERVICE_A_PORT:-3001}:3001"
+    volumes:
+      - service-a-data:/app/service-a/data
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  service-b:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: service-b/Dockerfile
+    environment:
+      PORT: "3002"
+      BASE_URL: ${SERVICE_B_BASE_URL:-http://localhost:3002}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
+      KEYCLOAK_REALM: crypto-sso
+      CLIENT_ID: service-b
+      CLIENT_SECRET: ${SERVICE_B_CLIENT_SECRET:-service-b-dev-secret}
+      SESSION_SECRET: ${SERVICE_B_SESSION_SECRET:-local-only-service-b-replace-this-session-secret}
+      ISSUER_KEY_URL: ${ISSUER_KEY_URL:-http://service-a:3001/api/issuer-key}
+      DATA_DIR: /app/service-b/data
+    ports:
+      - "${SERVICE_B_PORT:-3002}:3002"
+    volumes:
+      - service-b-data:/app/service-b/data
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      service-a:
+        condition: service_started
+
+volumes:
+  keycloak-data:
+  service-a-data:
+  service-b-data:
