@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# runtime data (issuer private key, certificate store, sessions)
+data/
+*.pem
+*.key
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs / OS / editor
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/
+
+# PPT 작업 산출물 (스크린샷은 docs/screenshots 에서 관리)
+~$*.pptx
