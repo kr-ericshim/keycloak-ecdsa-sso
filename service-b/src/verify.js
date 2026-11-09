@@ -15,9 +15,9 @@ function validFormat(certificate) {
     && text(p.id) && object(p.subject) && text(p.subject.sub) && text(p.subject.username)
     && object(p.issuer) && p.issuer.service === 'A' && text(p.issuer.name) && text(p.issuer.kid)
     && typeof p.issuedAt === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(p.issuedAt)
-    && Number.isFinite(Date.parse(p.issuedAt))
+    && Number.isFinite(Date.parse(p.issuedAt)) && new Date(p.issuedAt).toISOString() === p.issuedAt
     && s.alg === 'ES256' && s.curve === 'P-256' && s.kid === p.issuer.kid
-    && hex32.test(s.hash) && hex32.test(s.r) && hex32.test(s.s);
+    && [s.hash, s.r, s.s].every(value => typeof value === 'string' && hex32.test(value));
 }
 
 function keyPoint(key) {
@@ -50,7 +50,13 @@ export async function verifyCertificate(certificate, getIssuerKey) {
   const result = { valid: false, summary: '증명서 형식이 올바르지 않습니다.', steps, payload: null, math };
   const mark = (index, ok, detail) => Object.assign(steps[index], { ok, detail });
 
-  if (!validFormat(certificate)) {
+  let canonicalPayload;
+  try {
+    if (validFormat(certificate)) canonicalPayload = canonicalize(certificate.payload);
+  } catch {
+    // JSON이라도 지나치게 깊거나 정규화할 수 없는 구조는 형식 오류로 반환한다.
+  }
+  if (canonicalPayload === undefined) {
     mark(0, false, 'version, payload, ES256/P-256 서명 및 64자리 소문자 hex 값을 확인해 주세요.');
     return result;
   }
@@ -73,7 +79,7 @@ export async function verifyCertificate(certificate, getIssuerKey) {
   if (Q) mark(2, isOnCurve(Q), 'y² ≡ x³ − 3x + b (mod p)');
   const r = BigInt(`0x${signature.r}`), s = BigInt(`0x${signature.s}`);
   mark(3, r >= 1n && r < n && s >= 1n && s < n, '1 ≤ r, s < n 범위를 검사했습니다.');
-  const bytes = Buffer.from(canonicalize(certificate.payload), 'utf8');
+  const bytes = Buffer.from(canonicalPayload, 'utf8');
   math.e = createHash('sha256').update(bytes).digest('hex');
   mark(4, math.e === signature.hash, math.e === signature.hash ? '기록된 해시와 일치' : '기록된 해시와 다릅니다. 내용이 변경됐습니다.');
 

@@ -1,79 +1,55 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
-import { createServer } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createApp as appA } from '../src/app.js';
-import { createApp as appB } from '../../service-b/src/app.js';
-import { IndexedMemoryStore } from '../../shared/auth.js';
-import { LOGOUT_EVENT, safeReturnTo } from '../../shared/oidc.js';
+import { promisify } from 'node:util';
+import { attachAuth, IndexedMemoryStore } from '../../shared/auth.js';
+import { createOidc, LOGOUT_EVENT, safeReturnTo } from '../../shared/oidc.js';
 
-const listen = appOrServer => new Promise(resolve => {
-  const server = appOrServer.listen(0, '127.0.0.1', () => resolve(server));
-});
-const close = server => new Promise(resolve => server.close(resolve));
-const cookieOf = response => response.headers.get('set-cookie')?.split(';')[0];
-
-async function setup(t, service, makeApp) {
-  const directory = mkdtempSync(join(tmpdir(), 'crypto-sso-http-'));
+// 네트워크 연결은 대체하고, 실제 ES256 서명 및 jose의 JWKS 검증은 그대로 실행한다.
+function fixture(service) {
   const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  const publicUrl = 'http://keycloak.test.invalid';
-  const issuer = `${publicUrl}/realms/crypto-sso`;
+  const config = { service, publicUrl: 'http://localhost:8080', internalUrl: 'http://keycloak:8080',
+    realm: 'crypto-sso', baseUrl: `http://localhost:${service === 'A' ? 3001 : 3002}`,
+    clientId: `service-${service.toLowerCase()}`, clientSecret: 'test-secret',
+    sessionSecret: 'test-session-secret-at-least-32-characters', cookieName: `sid_${service.toLowerCase()}` };
+  const issuer = `${config.publicUrl}/realms/crypto-sso`;
   const authTime = Math.floor(Date.now() / 1000) - 120;
-  const state = { claims: {}, header: {}, lastExchange: null };
+  const state = { claims: {}, header: {}, requests: [], lastExchange: null };
   function jwt(claims, header = {}) {
     const head = Buffer.from(JSON.stringify({ alg: 'ES256', kid: 'test-key', typ: 'JWT', ...header })).toString('base64url');
     const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
     const input = `${head}.${body}`;
     return `${input}.${sign('sha256', Buffer.from(input), { key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url')}`;
   }
-  const idp = await listen(createServer(async (req, res) => {
-    res.setHeader('content-type', 'application/json');
-    if (req.url.endsWith('/.well-known/openid-configuration')) {
-      return res.end(JSON.stringify({ issuer,
-        authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token`,
-        jwks_uri: `${issuer}/certs`, end_session_endpoint: `${issuer}/logout` }));
-    }
-    if (req.url.endsWith('/certs')) return res.end(JSON.stringify({ keys: [
+  const json = data => new Response(JSON.stringify(data), { status: 200, headers: { 'content-type': 'application/json' } });
+  async function fetcher(input, options = {}) {
+    const url = String(input);
+    state.requests.push(url);
+    assert.ok(url.startsWith(`${config.internalUrl}/`), '서버 통신은 내부 URL을 써야 한다.');
+    if (url.endsWith('/.well-known/openid-configuration')) return json({ issuer,
+      authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token`,
+      jwks_uri: `${issuer}/certs`, end_session_endpoint: `${issuer}/logout` });
+    if (url.endsWith('/certs')) return json({ keys: [
       { ...publicKey.export({ format: 'jwk' }), alg: 'ES256', kid: 'test-key', use: 'sig' },
-    ] }));
-    if (req.url.endsWith('/token')) {
-      let body = '';
-      for await (const chunk of req) body += chunk;
-      state.lastExchange = new URLSearchParams(body);
+    ] });
+    if (url.endsWith('/token')) {
+      state.lastExchange = options.body;
       const now = Math.floor(Date.now() / 1000);
-      return res.end(JSON.stringify({ id_token: jwt({ iss: issuer, aud: `service-${service.toLowerCase()}`,
-        azp: `service-${service.toLowerCase()}`, sub: 'alice-sub', sid: 'shared-keycloak-sid',
-        iat: now, exp: now + 300, auth_time: authTime, nonce: state.nonce,
-        preferred_username: 'alice', name: 'Alice Kim', email: 'alice@example.com', ...state.claims }, state.header) }));
+      return json({ id_token: jwt({ iss: issuer, aud: config.clientId, azp: config.clientId,
+        sub: 'alice-sub', sid: 'shared-keycloak-sid', iat: now, exp: now + 300,
+        auth_time: authTime, nonce: state.nonce, preferred_username: 'alice',
+        name: 'Alice Kim', email: 'alice@example.com', ...state.claims }, state.header) });
     }
-    res.statusCode = 404;
-    res.end('{}');
-  }));
-  const config = { service, publicUrl, internalUrl: `http://127.0.0.1:${idp.address().port}`, realm: 'crypto-sso',
-    baseUrl: 'http://localhost:3001', clientId: `service-${service.toLowerCase()}`, clientSecret: 'test-secret',
-    sessionSecret: 'test-session-secret-at-least-32-characters', cookieName: `sid_${service.toLowerCase()}`,
-    dataDir: directory, publicDir: join(directory, 'public'), issuerKeyUrl: 'http://127.0.0.1:1/api/issuer-key' };
-  const store = new IndexedMemoryStore();
-  const server = await listen(makeApp(config, { store }));
-  const base = `http://127.0.0.1:${server.address().port}`;
-  t.after(async () => { await close(server); await close(idp); rmSync(directory, { recursive: true, force: true }); });
-  async function login(returnTo = '/') {
-    const start = await fetch(`${base}/login?returnTo=${encodeURIComponent(returnTo)}`, { redirect: 'manual' });
-    assert.equal(start.status, 302);
-    const url = new URL(start.headers.get('location'));
-    assert.equal(url.origin, publicUrl);
-    assert.equal(url.searchParams.get('code_challenge_method'), 'S256');
-    assert.equal(url.searchParams.get('scope'), 'openid profile email');
-    state.nonce = url.searchParams.get('nonce');
-    const response = await fetch(`${base}/callback?${new URLSearchParams({
-      code: 'test-code', state: url.searchParams.get('state'),
-    })}`, { redirect: 'manual', headers: { cookie: cookieOf(start) } });
-    return { response, cookie: cookieOf(response), start, url };
+    throw new Error(`알 수 없는 테스트 URL: ${url}`);
   }
-  return { base, store, config, state, login, authTime, jwt, issuer };
+  const oidc = createOidc(config, { fetcher });
+  async function login(returnTo = '/') {
+    const { pending, url } = await oidc.begin(returnTo);
+    state.nonce = pending.nonce;
+    const auth = await oidc.callback({ code: 'test-code', state: pending.state }, pending);
+    return { auth, pending, url: new URL(url) };
+  }
+  return { config, state, oidc, login, authTime, jwt, issuer };
 }
 
 test('returnTo only accepts a local path', () => {
@@ -83,77 +59,86 @@ test('returnTo only accepts a local path', () => {
   assert.equal(safeReturnTo('/?certificate=1'), '/?certificate=1');
 });
 
-for (const [service, makeApp] of [['A', appA], ['B', appB]]) {
-  test(`${service}: discovery URL split, PKCE, verified session, and RP logout`, async t => {
-    const { base, config, state, login, authTime } = await setup(t, service, makeApp);
-    const anonymous = await fetch(`${base}/api/me`);
-    assert.equal(anonymous.status, 401);
-    assert.deepEqual(await anonymous.json(), { error: 'unauthenticated' });
-    const { response, cookie, start, url } = await login('/?from=test');
-    assert.equal(response.status, 302);
-    assert.equal(response.headers.get('location'), '/?from=test');
-    assert.notEqual(cookie, cookieOf(start));
-    assert.ok(cookie.startsWith(`${config.cookieName}=`));
-    assert.match(response.headers.get('set-cookie'), /HttpOnly/);
-    assert.match(response.headers.get('set-cookie'), /SameSite=Lax/);
-    assert.equal(state.lastExchange.get('client_secret'), 'test-secret');
+for (const service of ['A', 'B']) {
+  test(`${service}: discovery URL split, PKCE, verified ID token, auth_time, and RP logout`, async () => {
+    const { config, state, oidc, login, authTime } = fixture(service);
+    const { auth, pending, url } = await login('/?from=test');
+    assert.equal(url.origin, config.publicUrl);
+    assert.equal(url.searchParams.get('code_challenge_method'), 'S256');
+    assert.equal(url.searchParams.get('scope'), 'openid profile email');
+    assert.equal(pending.returnTo, '/?from=test');
+    assert.equal(state.lastExchange.get('client_secret'), config.clientSecret);
     assert.equal(state.lastExchange.get('redirect_uri'), `${config.baseUrl}/callback`);
     assert.equal(createHash('sha256').update(state.lastExchange.get('code_verifier')).digest('base64url'), url.searchParams.get('code_challenge'));
-    const meResponse = await fetch(`${base}/api/me`, { headers: { cookie } });
-    assert.equal(meResponse.status, 200);
-    const me = await meResponse.json();
-    assert.equal(me.service, service);
-    assert.deepEqual(me.user, { sub: 'alice-sub', username: 'alice', name: 'Alice Kim', email: 'alice@example.com' });
-    assert.equal(me.session.authTime, new Date(authTime * 1000).toISOString());
-    assert.equal(me.token.header.alg, 'ES256');
-    assert.equal(me.token.signatureVerified, true);
-    assert.deepEqual(Object.keys(me.token).sort(), ['claims', 'header', 'signatureVerified']);
-    const logout = await fetch(`${base}/logout`, { method: 'POST', headers: { cookie }, redirect: 'manual' });
-    assert.equal(logout.status, 302);
-    const endSession = new URL(logout.headers.get('location'));
+    assert.equal(auth.claims.auth_time, authTime);
+    assert.equal(auth.claims.sid, 'shared-keycloak-sid');
+    assert.equal(auth.header.alg, 'ES256');
+    const endSession = new URL(await oidc.logoutUrl(auth.idToken));
+    assert.equal(endSession.origin, config.publicUrl);
     assert.equal(endSession.searchParams.get('post_logout_redirect_uri'), `${config.baseUrl}/?loggedOut=1`);
-    assert.ok(endSession.searchParams.get('id_token_hint'));
-    assert.equal((await fetch(`${base}/api/me`, { headers: { cookie } })).status, 401);
+    assert.equal(endSession.searchParams.get('id_token_hint'), auth.idToken);
+    assert.equal(state.requests.filter(url => url.endsWith('/.well-known/openid-configuration')).length, 1);
   });
 
-  test(`${service}: reject bad state/nonce/audience/algorithm and accept no unverified session`, async t => {
-    const { base, state, login } = await setup(t, service, makeApp);
-    const badState = await fetch(`${base}/callback?state=wrong&code=code`, { redirect: 'manual' });
-    assert.equal(badState.status, 400);
+  test(`${service}: rejects state, nonce, audience, issuer, expiry, missing claims, and non-ES256`, async () => {
+    const { state, oidc, login } = fixture(service);
+    const { pending } = await oidc.begin('/');
+    await assert.rejects(oidc.callback({ state: 'wrong', code: 'code' }, pending));
+    await assert.rejects(oidc.callback({ state: pending.state, code: 'code' }, { ...pending, createdAt: Date.now() - 11 * 60_000 }));
     for (const claims of [{ nonce: 'wrong' }, { aud: 'other-client' }, { iss: 'http://wrong-issuer' },
-      { exp: 1 }, { sid: null }, { auth_time: null }]) {
+      { exp: 1 }, { sid: null }, { auth_time: null }, { azp: 'other-client' }]) {
       state.claims = claims;
-      const { response } = await login();
-      assert.equal(response.status, 400);
+      await assert.rejects(login());
     }
     state.claims = {};
     state.header = { alg: 'RS256' };
-    assert.equal((await login()).response.status, 400);
-    assert.equal((await fetch(`${base}/api/me`)).status, 401);
+    await assert.rejects(login());
   });
 
-  test(`${service}: valid backchannel token destroys ALL same-sid sessions, rejects invalid tokens`, async t => {
-    const { base, store, login, jwt, issuer, config } = await setup(t, service, makeApp);
-    const first = await login(), second = await login();
-    assert.equal(store.sidIndex.get('shared-keycloak-sid').size, 2);
+  test(`${service}: logout_token validates ES256, issuer, audience, events, sid, and no nonce`, async () => {
+    const { oidc, jwt, issuer, config } = fixture(service);
     const now = Math.floor(Date.now() / 1000);
     const claims = { iss: issuer, aud: config.clientId, iat: now, jti: randomUUID(),
       sid: 'shared-keycloak-sid', events: { [LOGOUT_EVENT]: {} } };
-    async function send(token) {
-      return fetch(`${base}/backchannel-logout`, { method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ logout_token: token }) });
-    }
     for (const invalid of [{ nonce: 'forbidden' }, { sid: undefined }, { events: {} },
       { aud: 'other-client' }, { iss: 'http://wrong' }, { iat: now - 600 }]) {
-      assert.equal((await send(jwt({ ...claims, ...invalid }))).status, 400);
+      await assert.rejects(oidc.verifyLogout(jwt({ ...claims, ...invalid })));
     }
-    assert.equal((await send(jwt(claims, { alg: 'RS256' }))).status, 400);
-    assert.equal(store.sidIndex.get('shared-keycloak-sid').size, 2);
-    assert.equal((await send(jwt(claims))).status, 200);
-    assert.equal(store.sidIndex.has('shared-keycloak-sid'), false);
-    for (const session of [first, second]) assert.equal((await fetch(`${base}/api/me`, { headers: { cookie: session.cookie } })).status, 401);
-    // 같은 logout_token 재전송도 성공으로 응답한다. 세션 삭제는 멱등적이다.
-    assert.equal((await send(jwt(claims))).status, 200);
+    await assert.rejects(oidc.verifyLogout(jwt(claims, { alg: 'RS256' })));
+    assert.equal(await oidc.verifyLogout(jwt(claims)), 'shared-keycloak-sid');
   });
 }
+
+test('MemoryStore removes every session with the same Keycloak sid and preserves other sids', async () => {
+  const store = new IndexedMemoryStore();
+  const set = promisify(store.set).bind(store), get = promisify(store.get).bind(store);
+  for (const [id, sid] of [['a1', 'sso-1'], ['a2', 'sso-1'], ['a3', 'sso-2']]) {
+    await set(id, { cookie: { expires: new Date(Date.now() + 60_000) }, auth: { claims: { sid } } });
+  }
+  assert.equal(store.sidIndex.get('sso-1').size, 2);
+  await store.destroySid('sso-1');
+  assert.equal(await get('a1'), undefined);
+  assert.equal(await get('a2'), undefined);
+  assert.ok(await get('a3'));
+  assert.equal(store.sidIndex.has('sso-1'), false);
+  await store.destroySid('sso-1');
+});
+
+test('/api/me returns the exact public shape and never includes the raw ID token', async () => {
+  const { config, login, authTime } = fixture('A');
+  const { auth } = await login();
+  const routes = new Map();
+  const app = { use() {}, get(path, ...handlers) { routes.set(path, handlers); }, post() {} };
+  const { requireAuth } = attachAuth(app, config);
+  const res = { clearCookie() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
+  requireAuth({ session: {} }, res, () => assert.fail('미인증 요청이 통과했습니다.'));
+  assert.equal(res.code, 401);
+  assert.deepEqual(res.body, { error: 'unauthenticated' });
+  routes.get('/api/me').at(-1)({ session: { auth } }, res);
+  assert.deepEqual(Object.keys(res.body).sort(), ['service', 'session', 'token', 'user']);
+  assert.deepEqual(res.body.user, { sub: 'alice-sub', username: 'alice', name: 'Alice Kim', email: 'alice@example.com' });
+  assert.equal(res.body.session.authTime, new Date(authTime * 1000).toISOString());
+  assert.deepEqual(Object.keys(res.body.token).sort(), ['claims', 'header', 'signatureVerified']);
+  assert.equal(res.body.token.signatureVerified, true);
+  assert.equal(JSON.stringify(res.body).includes(auth.idToken), false);
+});

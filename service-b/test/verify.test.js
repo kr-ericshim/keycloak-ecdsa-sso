@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadIssuer, issueCertificate } from '../../service-a/src/crypto.js';
 import { verifyCertificate } from '../src/verify.js';
+import { createIssuerKeySource } from '../src/issuer-key.js';
 import { G, p, n, add, multiply, isOnCurve, manualVerify } from '../src/ecc-p256.js';
 
 function fixture(t) {
@@ -82,6 +83,9 @@ test('broken format, key outage, and out-of-range signatures give partial result
     assert.equal(result.payload, null);
     assert.deepEqual(result.steps.map(step => step.ok), [false, null, null, null, null, null]);
   }
+  const badHex = structuredClone(certificate);
+  badHex.signature.r = [badHex.signature.r];
+  assert.equal((await verifyCertificate(badHex, async () => issuer.publicInfo)).steps[0].ok, false);
   const outage = await verifyCertificate(certificate, async () => { throw new Error('발급소 연결 실패'); });
   assert.deepEqual(outage.steps.map(step => step.ok), [true, false, null, true, true, null]);
   const badRange = structuredClone(certificate);
@@ -90,4 +94,22 @@ test('broken format, key outage, and out-of-range signatures give partial result
   assert.equal(result.steps[3].ok, false);
   assert.equal(result.steps[5].ok, null);
   assert.equal(result.math.w, null);
+});
+
+test('issuer key cache refreshes once on a changed or unknown kid', async t => {
+  let kid = 'old-key', requests = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    assert.equal(url, 'http://issuer.test/api/issuer-key');
+    requests++;
+    return new Response(JSON.stringify({ kid }));
+  });
+  const getKey = createIssuerKeySource('http://issuer.test/api/issuer-key');
+  assert.equal((await getKey('old-key')).kid, 'old-key');
+  await getKey('old-key');
+  assert.equal(requests, 1);
+  kid = 'new-key';
+  assert.equal((await getKey('new-key')).kid, 'new-key');
+  assert.equal(requests, 2);
+  await assert.rejects(getKey('unknown-key'));
+  assert.equal(requests, 3);
 });

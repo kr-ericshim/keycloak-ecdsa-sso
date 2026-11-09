@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createRemoteJWKSet, customFetch, jwtVerify } from 'jose';
 
 export const LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 
@@ -14,7 +14,7 @@ function equalSecret(actual, expected) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function createOidc(config) {
+export function createOidc(config, { fetcher = globalThis.fetch } = {}) {
   const issuer = `${config.publicUrl}/realms/${encodeURIComponent(config.realm)}`;
   const redirectUri = `${config.baseUrl}/callback`;
   let discoveryPromise;
@@ -40,7 +40,7 @@ export function createOidc(config) {
   async function discover() {
     if (!discoveryPromise) {
       discoveryPromise = (async () => {
-        const response = await fetch(serverUrl(`${issuer}/.well-known/openid-configuration`), {
+        const response = await fetcher(serverUrl(`${issuer}/.well-known/openid-configuration`), {
           signal: AbortSignal.timeout(5000),
         });
         if (!response.ok) throw new Error('Keycloak discovery에 실패했습니다.');
@@ -49,7 +49,9 @@ export function createOidc(config) {
         for (const name of ['authorization_endpoint', 'token_endpoint', 'jwks_uri', 'end_session_endpoint']) {
           if (typeof metadata[name] !== 'string') throw new Error(`발견 문서에 ${name}가 없습니다.`);
         }
-        jwks = createRemoteJWKSet(new URL(serverUrl(metadata.jwks_uri)), { timeoutDuration: 5000 });
+        jwks = createRemoteJWKSet(new URL(serverUrl(metadata.jwks_uri)), {
+          timeoutDuration: 5000, [customFetch]: fetcher,
+        });
         return metadata;
       })().catch(error => { discoveryPromise = undefined; throw error; });
     }
@@ -77,11 +79,12 @@ export function createOidc(config) {
 
   async function callback(query, pending) {
     if (!pending || Date.now() - pending.createdAt > 10 * 60_000
-      || !equalSecret(query.state, pending.state) || typeof query.code !== 'string' || query.error) {
+      || !equalSecret(query.state, pending.state) || typeof query.code !== 'string' || query.error
+      || (query.iss !== undefined && query.iss !== issuer)) {
       throw new Error('로그인 요청의 state 또는 유효 시간이 올바르지 않습니다.');
     }
     const metadata = await discover();
-    const response = await fetch(serverUrl(metadata.token_endpoint), {
+    const response = await fetcher(serverUrl(metadata.token_endpoint), {
       method: 'POST', signal: AbortSignal.timeout(5000),
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'authorization_code', code: query.code,
@@ -100,7 +103,8 @@ export function createOidc(config) {
       || (Array.isArray(claims.aud) && claims.aud.length > 1 && claims.azp !== config.clientId)
       || typeof claims.sid !== 'string' || !claims.sid || typeof claims.sub !== 'string' || !claims.sub
       || !Number.isFinite(claims.auth_time) || claims.auth_time < 0
-      || claims.auth_time > Date.now() / 1000 + 5 || claims.iat > Date.now() / 1000 + 5) {
+      || claims.auth_time > Date.now() / 1000 + 5
+      || !Number.isFinite(claims.iat) || claims.iat > Date.now() / 1000 + 5) {
       throw new Error('ID 토큰의 nonce 또는 사용자/세션 클레임이 올바르지 않습니다.');
     }
     return { idToken: tokens.id_token, claims, header, loginAt: new Date().toISOString() };
@@ -124,7 +128,8 @@ export function createOidc(config) {
     });
     const event = payload.events?.[LOGOUT_EVENT];
     if (typeof payload.sid !== 'string' || !payload.sid || typeof payload.jti !== 'string' || !payload.jti
-      || Object.hasOwn(payload, 'nonce') || !event || typeof event !== 'object' || Array.isArray(event)) {
+      || Object.hasOwn(payload, 'nonce') || !event || typeof event !== 'object'
+      || Array.isArray(event) || Object.keys(event).length !== 0) {
       throw new Error('로그아웃 토큰의 events, sid 또는 nonce가 올바르지 않습니다.');
     }
     return payload.sid;
